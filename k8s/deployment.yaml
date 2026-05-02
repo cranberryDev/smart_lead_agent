@@ -1,0 +1,97 @@
+# Kubernetes manifests for the FastAPI follow-up service.
+#
+# 1) Build and publish an image (replace registry/name/tag):
+#      docker build -t YOUR_REGISTRY/smart-followup-agent:v1 .
+#      docker push YOUR_REGISTRY/smart-followup-agent:v1
+#
+# 2) Create secrets (never commit real keys):
+#      kubectl create secret generic smart-followup-agent \
+#        --from-literal=AI_FOUNDRY_API_KEY='YOUR_KEY'
+#
+# 3) Edit the ConfigMap below with your Foundry URL settings, then:
+#      kubectl apply -f k8s/deployment.yaml
+#
+# Also set spec.template.spec.containers[0].image to your pushed image.
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smart-followup-agent-config
+  labels:
+    app: smart-followup-agent
+data:
+  AI_FOUNDRY_CHAT_URL: ""
+  AI_FOUNDRY_ENDPOINT: ""
+  AI_FOUNDRY_DEPLOYMENT: ""
+  AI_FOUNDRY_API_VERSION: "2024-08-01-preview"
+  AI_FOUNDRY_USE_BEARER: "false"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smart-followup-agent
+  labels:
+    app: smart-followup-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smart-followup-agent
+  template:
+    metadata:
+      labels:
+        app: smart-followup-agent
+    spec:
+      containers:
+        - name: api
+          image: YOUR_REGISTRY/smart-followup-agent:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: smart-followup-agent-config
+          env:
+            - name: AI_FOUNDRY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: smart-followup-agent
+                  key: AI_FOUNDRY_API_KEY
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smart-followup-agent
+  labels:
+    app: smart-followup-agent
+spec:
+  type: ClusterIP
+  selector:
+    app: smart-followup-agent
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

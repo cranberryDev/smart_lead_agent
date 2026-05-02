@@ -1,0 +1,17 @@
+.venv
+venv
+__pycache__
+*.py[cod]
+*.egg-info
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
+deploy
+k8s
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.cursor
